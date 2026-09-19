@@ -1,5 +1,6 @@
 pub mod companion;
 pub mod context;
+pub mod events;
 mod overlay;
 pub mod status;
 

@@ -33,6 +33,8 @@ pub enum SpriteLoop {
     Working,
     Thinking,
     Warning,
+    Charging,
+    Presence,
 }
 
 impl SpriteLoop {
@@ -47,6 +49,7 @@ impl SpriteLoop {
             Self::Alert | Self::Flinch => 3,
             Self::Idle | Self::Party | Self::Working | Self::Thinking => 5,
             Self::Warning => 5,
+            Self::Charging | Self::Presence => 5,
         }
     }
 
@@ -58,6 +61,7 @@ impl SpriteLoop {
             Self::Idle | Self::Working | Self::Thinking => Duration::from_millis(250),
             Self::Party => Duration::from_millis(167),
             Self::Warning => Duration::from_millis(250),
+            Self::Charging | Self::Presence => Duration::from_millis(250),
             _ => Duration::from_millis(450),
         }
     }

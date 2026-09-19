@@ -11,6 +11,7 @@ use gtk4_layer_shell::{Edge, KeyboardMode, Layer, LayerShell};
 
 use crate::companion::{Companion, SpriteLoop};
 use crate::context::FocusContext;
+use crate::events::{EventKind, LocalEvent, record};
 use crate::status::{AlertEngine, format_status, read_status, send_notification};
 
 const OWL_SIZE_PX: i32 = 126;
@@ -127,13 +128,31 @@ fn build_overlay(app: &gtk::Application) {
             if now.duration_since(*last_status_poll.borrow()) >= STATUS_POLL_INTERVAL {
                 *last_status_poll.borrow_mut() = now;
                 let status = read_status();
-                life.borrow_mut().set_focus(status.focus);
+                life.borrow_mut().set_status(
+                    status.focus,
+                    status
+                        .battery
+                        .as_ref()
+                        .is_some_and(|battery| battery.charging),
+                );
+                if let Some(focus) = status.focus {
+                    let _ = record(&LocalEvent {
+                        kind: EventKind::Activity,
+                        summary: "Focused application context".to_owned(),
+                        detail: focus.label().to_owned(),
+                    });
+                }
                 for alert in alert_engine
                     .borrow_mut()
                     .evaluate(&status, now.duration_since(started_at))
                 {
                     send_notification(alert, &status);
                     life.borrow_mut().trigger_warning();
+                    let _ = record(&LocalEvent {
+                        kind: EventKind::System,
+                        summary: alert.summary().to_owned(),
+                        detail: format_status(&status),
+                    });
                 }
             }
 
@@ -172,7 +191,9 @@ fn apply_animation(companion: &mut Companion, animation: SpriteLoop) {
         | SpriteLoop::Party
         | SpriteLoop::Working
         | SpriteLoop::Thinking
-        | SpriteLoop::Warning => companion.set_visual_animation(animation),
+        | SpriteLoop::Warning
+        | SpriteLoop::Charging
+        | SpriteLoop::Presence => companion.set_visual_animation(animation),
     }
 }
 
@@ -208,6 +229,7 @@ struct PetLife {
     music_playing: bool,
     focus: Option<FocusContext>,
     warning_for: Duration,
+    charging: bool,
     rng: u64,
 }
 
@@ -224,6 +246,7 @@ impl Default for PetLife {
             music_playing: false,
             focus: None,
             warning_for: Duration::ZERO,
+            charging: false,
             rng: session_seed(),
         }
     }
@@ -277,6 +300,7 @@ impl PetLife {
 
         let seconds = elapsed.as_secs_f64();
         let animation = match self.mode {
+            PetMode::Rest if self.charging => SpriteLoop::Charging,
             PetMode::Rest => match self.focus {
                 Some(FocusContext::Coding) => SpriteLoop::Working,
                 Some(FocusContext::Browsing) => SpriteLoop::Thinking,
@@ -320,8 +344,9 @@ impl PetLife {
         }
     }
 
-    fn set_focus(&mut self, focus: Option<FocusContext>) {
+    fn set_status(&mut self, focus: Option<FocusContext>, charging: bool) {
         self.focus = focus;
+        self.charging = charging;
     }
 
     fn trigger_warning(&mut self) {
@@ -431,13 +456,17 @@ fn frame_path(animation: SpriteLoop, frame: u8) -> PathBuf {
         SpriteLoop::Working => ("working_loop", "typing"),
         SpriteLoop::Thinking => ("thinking_loop", "neutral"),
         SpriteLoop::Warning => ("warning_to_error", "caution"),
+        SpriteLoop::Charging => ("charging_loop", "charge_start"),
+        SpriteLoop::Presence => ("companion_presence", "presence_01"),
     };
     let root = match animation {
         SpriteLoop::Idle
         | SpriteLoop::Party
         | SpriteLoop::Working
         | SpriteLoop::Thinking
-        | SpriteLoop::Warning => "assets/sprites/companion-v2",
+        | SpriteLoop::Warning
+        | SpriteLoop::Charging
+        | SpriteLoop::Presence => "assets/sprites/companion-v2",
         _ => "assets/sprites/clockwork-owl",
     };
     let filename = match animation {
@@ -451,11 +480,11 @@ fn frame_path(animation: SpriteLoop, frame: u8) -> PathBuf {
         ][frame as usize]
             .to_owned(),
         SpriteLoop::Working => [
-            "00_typing.png",
-            "01_scanning.png",
-            "02_teaching.png",
-            "03_uploading.png",
-            "04_downloading.png",
+            "00_ready_keyboard.png",
+            "01_typing.png",
+            "02_scan_panel.png",
+            "03_confirm_task.png",
+            "04_ready_loop.png",
         ][frame as usize]
             .to_owned(),
         SpriteLoop::Thinking => [
@@ -474,6 +503,15 @@ fn frame_path(animation: SpriteLoop, frame: u8) -> PathBuf {
             "04_critical_error.png",
         ][frame as usize]
             .to_owned(),
+        SpriteLoop::Charging => [
+            "00_charge_start.png",
+            "01_charge_build.png",
+            "02_charge_peak.png",
+            "03_charge_stable.png",
+            "04_charge_rest.png",
+        ][frame as usize]
+            .to_owned(),
+        SpriteLoop::Presence => format!("{frame:02}_presence_{:02}.png", frame + 1),
         _ => format!("{prefix}_{frame:02}.png"),
     };
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -489,7 +527,15 @@ fn load_frame(animation: SpriteLoop, frame: u8) -> gdk_pixbuf::Pixbuf {
         OWL_SIZE_PX,
         true,
     )
-    .expect("the active animation manifest must reference a valid owl sprite")
+    .unwrap_or_else(|_| {
+        gdk_pixbuf::Pixbuf::from_file_at_scale(
+            frame_path(SpriteLoop::Perch, 0),
+            OWL_SIZE_PX,
+            OWL_SIZE_PX,
+            true,
+        )
+        .expect("the base owl sprite must be available")
+    })
 }
 
 #[cfg(test)]
@@ -531,6 +577,7 @@ mod tests {
             music_playing: false,
             focus: None,
             warning_for: Duration::ZERO,
+            charging: false,
             rng: 1,
         };
 
