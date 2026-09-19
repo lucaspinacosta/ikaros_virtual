@@ -231,7 +231,8 @@ fn build_overlay(app: &gtk::Application) {
                         .as_ref()
                         .is_some_and(|battery| battery.charging),
                 );
-                life.borrow_mut().set_fullscreen(focused_fullscreen().unwrap_or(false));
+                life.borrow_mut()
+                    .set_fullscreen(focused_fullscreen().unwrap_or(false));
                 if let Some(focus) = status.focus {
                     let _ = record(&LocalEvent {
                         kind: EventKind::Activity,
