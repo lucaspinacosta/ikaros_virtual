@@ -1,0 +1,10 @@
+[package]
+name = "ikaros-virtual"
+version = "0.1.0"
+edition = "2024"
+description = "A permission-gated Linux desktop owl companion"
+
+[dependencies]
+gdk-pixbuf = "0.22"
+gtk = { package = "gtk4", version = "0.11" }
+gtk4-layer-shell = "0.8.1"

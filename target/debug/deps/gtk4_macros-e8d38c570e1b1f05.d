@@ -1,0 +1,9 @@
+/home/lucaspinacosta/.Applications/ikaros_virtual/target/debug/deps/gtk4_macros-e8d38c570e1b1f05.d: /home/lucaspinacosta/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/gtk4-macros-0.11.4/src/lib.rs /home/lucaspinacosta/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/gtk4-macros-0.11.4/src/attribute_parser.rs /home/lucaspinacosta/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/gtk4-macros-0.11.4/src/composite_template_derive.rs /home/lucaspinacosta/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/gtk4-macros-0.11.4/src/template_callbacks_attribute.rs /home/lucaspinacosta/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/gtk4-macros-0.11.4/src/util.rs
+
+/home/lucaspinacosta/.Applications/ikaros_virtual/target/debug/deps/libgtk4_macros-e8d38c570e1b1f05.so: /home/lucaspinacosta/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/gtk4-macros-0.11.4/src/lib.rs /home/lucaspinacosta/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/gtk4-macros-0.11.4/src/attribute_parser.rs /home/lucaspinacosta/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/gtk4-macros-0.11.4/src/composite_template_derive.rs /home/lucaspinacosta/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/gtk4-macros-0.11.4/src/template_callbacks_attribute.rs /home/lucaspinacosta/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/gtk4-macros-0.11.4/src/util.rs
+
+/home/lucaspinacosta/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/gtk4-macros-0.11.4/src/lib.rs:
+/home/lucaspinacosta/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/gtk4-macros-0.11.4/src/attribute_parser.rs:
+/home/lucaspinacosta/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/gtk4-macros-0.11.4/src/composite_template_derive.rs:
+/home/lucaspinacosta/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/gtk4-macros-0.11.4/src/template_callbacks_attribute.rs:
+/home/lucaspinacosta/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/gtk4-macros-0.11.4/src/util.rs:

@@ -1,0 +1,44 @@
+{
+  "name": "clockwork-owl",
+  "version": 1,
+  "frame_size": [256, 256],
+  "format": "RGBA_8888",
+  "source": "Recreated Clockwork Owl pack supplied by the project owner.",
+  "animations": {
+    "perch": {
+      "frames": ["perch_blink/perch_blink_00.png", "perch_blink/perch_blink_01.png", "perch_blink/perch_blink_02.png", "perch_blink/perch_blink_03.png"],
+      "fps": 2,
+      "loop": true
+    },
+    "blink": {
+      "frames": ["perch_blink/perch_blink_00.png", "perch_blink/perch_blink_01.png", "perch_blink/perch_blink_02.png", "perch_blink/perch_blink_03.png"],
+      "fps": 4,
+      "loop": false
+    },
+    "sleep": {
+      "frames": ["sleep_idle/sleep_idle_00.png", "sleep_idle/sleep_idle_01.png", "sleep_idle/sleep_idle_02.png", "sleep_idle/sleep_idle_03.png"],
+      "fps": 2,
+      "loop": true
+    },
+    "walk_left": {
+      "frames": ["walk_left/walk_left_00.png", "walk_left/walk_left_01.png", "walk_left/walk_left_02.png", "walk_left/walk_left_03.png", "walk_left/walk_left_04.png", "walk_left/walk_left_05.png", "walk_left/walk_left_06.png", "walk_left/walk_left_07.png"],
+      "fps": 8,
+      "loop": true
+    },
+    "walk_right": {
+      "frames": ["walk_right/walk_right_00.png", "walk_right/walk_right_01.png", "walk_right/walk_right_02.png", "walk_right/walk_right_03.png"],
+      "fps": 8,
+      "loop": true
+    },
+    "fly": {
+      "frames": ["wing_flap/wing_flap_00.png", "wing_flap/wing_flap_01.png", "wing_flap/wing_flap_02.png", "wing_flap/wing_flap_03.png"],
+      "fps": 12,
+      "loop": true
+    },
+    "alert": {
+      "frames": ["alert_flinch/alert_flinch_00.png", "alert_flinch/alert_flinch_01.png", "alert_flinch/alert_flinch_02.png"],
+      "fps": 6,
+      "loop": false
+    }
+  }
+}

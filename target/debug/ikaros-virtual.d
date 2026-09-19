@@ -1,0 +1,1 @@
+/home/lucaspinacosta/.Applications/ikaros_virtual/target/debug/ikaros-virtual: /home/lucaspinacosta/.Applications/ikaros_virtual/src/companion.rs /home/lucaspinacosta/.Applications/ikaros_virtual/src/main.rs /home/lucaspinacosta/.Applications/ikaros_virtual/src/overlay.rs

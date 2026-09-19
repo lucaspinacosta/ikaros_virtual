@@ -1,0 +1,15 @@
+[Unit]
+Description=Ikaros virtual owl companion
+After=default.target
+
+[Service]
+Type=simple
+WorkingDirectory=/home/lucaspinacosta/.Applications/ikaros_virtual
+ExecStart=/home/lucaspinacosta/.Applications/ikaros_virtual/target/release/ikaros-virtual
+Environment=GDK_BACKEND=wayland
+Environment=IKAROS_FOCUSED_APP_AWARENESS=1
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=default.target
