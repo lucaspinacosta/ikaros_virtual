@@ -3,19 +3,27 @@ use std::{
     path::PathBuf,
     process::Command,
     rc::Rc,
+    sync::mpsc,
     time::{Duration, Instant, SystemTime, UNIX_EPOCH},
 };
 
+use chrono::{Local, Timelike};
 use gtk::{gdk::prelude::SurfaceExt, glib, prelude::*};
 use gtk4_layer_shell::{Edge, KeyboardMode, Layer, LayerShell};
 
-use crate::collectors::{SessionEvent, session_event, session_locked};
+use crate::calendar::{CalendarWatcher, RoutineWatcher};
+use crate::collectors::{
+    FileWatcher, IdleWatcher, SessionEvent, SystemdUnitWatcher, TaskCompletionAdapter, file_event,
+    notification_event, session_event, session_idle, session_locked, task_event,
+};
 use crate::companion::{Companion, SpriteLoop};
-use crate::context::FocusContext;
-use crate::events::{EventKind, LocalEvent, record};
+use crate::context::{FocusContext, focused_fullscreen};
+use crate::events::{EventKind, EventStore, LocalEvent, event_log_path, record};
+use crate::settings::Settings;
 use crate::status::{AlertEngine, format_status, read_status, send_notification};
+use crate::{notifications::NotificationWatcher, routing::animation_for};
 
-const OWL_SIZE_PX: i32 = 126;
+const OWL_SIZE_PX: i32 = 84;
 const SCREEN_MARGIN_PX: f64 = 16.0;
 const SIGNAL_POLL_INTERVAL: Duration = Duration::from_secs(2);
 const STATUS_POLL_INTERVAL: Duration = Duration::from_secs(15);
@@ -58,9 +66,16 @@ fn build_status_panel(app: &gtk::Application) {
     monitor.connect_clicked(|_| {
         let _ = Command::new("gnome-system-monitor").spawn();
     });
+    let pause = gtk::Button::with_label("Pause reactions for one hour");
+    pause.connect_clicked(|_| {
+        let mut settings = Settings::load();
+        settings.pause_for_one_hour();
+        let _ = settings.save();
+    });
     content.append(&title);
     content.append(&status);
     content.append(&monitor);
+    content.append(&pause);
     window.set_child(Some(&content));
     window.present();
     glib::timeout_add_local(Duration::from_secs(5), move || {
@@ -116,6 +131,31 @@ fn build_overlay(app: &gtk::Application) {
     let alert_engine = Rc::new(RefCell::new(AlertEngine::default()));
     let last_session_poll = Rc::new(RefCell::new(started_at - SESSION_POLL_INTERVAL));
     let locked = Rc::new(RefCell::new(None));
+    let idle_watcher = Rc::new(RefCell::new(IdleWatcher::default()));
+    let settings = Settings::load();
+    let calendar_watcher = settings
+        .calendar_path
+        .clone()
+        .map(CalendarWatcher::new)
+        .map(RefCell::new);
+    let routine_watcher = Rc::new(RefCell::new(RoutineWatcher::new(
+        settings.routines.clone(),
+        settings.break_reminder_minutes,
+    )));
+    let unit_watcher = Rc::new(RefCell::new(SystemdUnitWatcher::new(
+        settings.watched_units.clone(),
+    )));
+    let file_watcher = std::env::var_os("IKAROS_WATCH_DIRECTORY")
+        .map(PathBuf::from)
+        .map(FileWatcher::new)
+        .map(RefCell::new);
+    let (notification_sender, notification_receiver) = mpsc::sync_channel(64);
+    // The monitor is best-effort: desktop use continues when dbus-monitor is unavailable.
+    let notification_watcher = std::env::var("IKAROS_READ_NOTIFICATIONS")
+        .ok()
+        .as_deref()
+        .filter(|value| *value == "1")
+        .and_then(|_| NotificationWatcher::start(notification_sender).ok());
     glib::timeout_add_local(Duration::from_millis(50), {
         let companion = Rc::clone(&companion);
         let life = Rc::clone(&life);
@@ -126,7 +166,12 @@ fn build_overlay(app: &gtk::Application) {
         let alert_engine = Rc::clone(&alert_engine);
         let last_session_poll = Rc::clone(&last_session_poll);
         let locked = Rc::clone(&locked);
+        let idle_watcher = Rc::clone(&idle_watcher);
+        let routine_watcher = Rc::clone(&routine_watcher);
+        let unit_watcher = Rc::clone(&unit_watcher);
         move || {
+            // Keep the child process alive for the lifetime of the GTK callback.
+            let _ = &notification_watcher;
             let now = Instant::now();
             let elapsed = now.duration_since(*last_update.borrow());
             *last_update.borrow_mut() = now;
@@ -143,11 +188,42 @@ fn build_overlay(app: &gtk::Application) {
                         }));
                     }
                 }
+                if let Some(event) = idle_watcher.borrow_mut().poll(session_idle()) {
+                    let event = session_event(event);
+                    let _ = record(&event);
+                    life.borrow_mut().trigger_reaction(animation_for(&event));
+                }
+                if let Some(watcher) = &file_watcher {
+                    for event in watcher.borrow_mut().poll() {
+                        let event = file_event(event);
+                        let _ = record(&event);
+                        life.borrow_mut().trigger_reaction(animation_for(&event));
+                    }
+                }
+            }
+
+            for notification in notification_receiver.try_iter().take(4) {
+                let event = notification_event(notification);
+                let _ = record(&event);
+                life.borrow_mut().trigger_reaction(animation_for(&event));
             }
 
             if now.duration_since(*last_status_poll.borrow()) >= STATUS_POLL_INTERVAL {
                 *last_status_poll.borrow_mut() = now;
+                let _ = EventStore::at(event_log_path()).prune();
                 let status = read_status();
+                let settings = Settings::load();
+                life.borrow_mut().set_preferences(
+                    settings.reactions_paused(),
+                    settings.quiet_hours.is_some_and(|quiet_hours| {
+                        let hour = Local::now().hour() as u8;
+                        if quiet_hours.start_hour <= quiet_hours.end_hour {
+                            (quiet_hours.start_hour..quiet_hours.end_hour).contains(&hour)
+                        } else {
+                            hour >= quiet_hours.start_hour || hour < quiet_hours.end_hour
+                        }
+                    }),
+                );
                 life.borrow_mut().set_status(
                     status.focus,
                     status
@@ -155,12 +231,28 @@ fn build_overlay(app: &gtk::Application) {
                         .as_ref()
                         .is_some_and(|battery| battery.charging),
                 );
+                life.borrow_mut().set_fullscreen(focused_fullscreen().unwrap_or(false));
                 if let Some(focus) = status.focus {
                     let _ = record(&LocalEvent {
                         kind: EventKind::Activity,
                         summary: "Focused application context".to_owned(),
                         detail: focus.label().to_owned(),
                     });
+                }
+                if let Some(watcher) = &calendar_watcher {
+                    for event in watcher.borrow_mut().poll_at(Local::now()) {
+                        dispatch_task_event(event, &life);
+                    }
+                }
+                for event in routine_watcher.borrow_mut().tick(
+                    Local::now(),
+                    STATUS_POLL_INTERVAL,
+                    idle_watcher.borrow().is_idle(),
+                ) {
+                    dispatch_task_event(event, &life);
+                }
+                for event in unit_watcher.borrow_mut().poll() {
+                    dispatch_task_event(event, &life);
                 }
                 for alert in alert_engine
                     .borrow_mut()
@@ -184,6 +276,7 @@ fn build_overlay(app: &gtk::Application) {
 
             let mut life = life.borrow_mut();
             life.set_locked(locked.borrow().unwrap_or(false));
+            life.set_idle(idle_watcher.borrow().is_idle());
             life.update_music_signal(elapsed);
             let state = life.tick(elapsed, width, height);
             let mut companion = companion.borrow_mut();
@@ -214,7 +307,10 @@ fn apply_animation(companion: &mut Companion, animation: SpriteLoop) {
         | SpriteLoop::Thinking
         | SpriteLoop::Warning
         | SpriteLoop::Charging
-        | SpriteLoop::Presence => companion.set_visual_animation(animation),
+        | SpriteLoop::Presence
+        | SpriteLoop::Success
+        | SpriteLoop::Notification
+        | SpriteLoop::Silly => companion.set_visual_animation(animation),
     }
 }
 
@@ -250,8 +346,13 @@ struct PetLife {
     music_playing: bool,
     focus: Option<FocusContext>,
     warning_for: Duration,
+    reaction: Option<(SpriteLoop, Duration)>,
     charging: bool,
     locked: bool,
+    idle: bool,
+    fullscreen: bool,
+    paused: bool,
+    quiet: bool,
     rng: u64,
 }
 
@@ -268,8 +369,13 @@ impl Default for PetLife {
             music_playing: false,
             focus: None,
             warning_for: Duration::ZERO,
+            reaction: None,
             charging: false,
             locked: false,
+            idle: false,
+            fullscreen: false,
+            paused: false,
+            quiet: false,
             rng: session_seed(),
         }
     }
@@ -284,6 +390,22 @@ impl PetLife {
             self.initialized = true;
         }
 
+        if self.locked || self.idle {
+            return PetFrame {
+                x: self.x,
+                y: floor_y,
+                animation: SpriteLoop::Sleep,
+            };
+        }
+
+        if self.paused || self.quiet || self.fullscreen {
+            return PetFrame {
+                x: self.x,
+                y: floor_y,
+                animation: SpriteLoop::Perch,
+            };
+        }
+
         if self.music_playing {
             self.mode = PetMode::Dance;
             self.mode_elapsed += elapsed;
@@ -296,11 +418,13 @@ impl PetLife {
             };
         }
 
-        if self.locked {
+        if let Some((animation, remaining)) = self.reaction {
+            let remaining = remaining.saturating_sub(elapsed);
+            self.reaction = (remaining > Duration::ZERO).then_some((animation, remaining));
             return PetFrame {
                 x: self.x,
                 y: floor_y,
-                animation: SpriteLoop::Sleep,
+                animation,
             };
         }
 
@@ -384,8 +508,25 @@ impl PetLife {
         self.locked = locked;
     }
 
+    fn set_idle(&mut self, idle: bool) {
+        self.idle = idle;
+    }
+
+    fn set_fullscreen(&mut self, fullscreen: bool) {
+        self.fullscreen = fullscreen;
+    }
+
+    fn set_preferences(&mut self, paused: bool, quiet: bool) {
+        self.paused = paused;
+        self.quiet = quiet;
+    }
+
     fn trigger_warning(&mut self) {
         self.warning_for = Duration::from_secs(4);
+    }
+
+    fn trigger_reaction(&mut self, animation: SpriteLoop) {
+        self.reaction = Some((animation, Duration::from_secs(3)));
     }
 
     fn start_next_mode(&mut self, width: f64, height: f64) {
@@ -493,6 +634,9 @@ fn frame_path(animation: SpriteLoop, frame: u8) -> PathBuf {
         SpriteLoop::Warning => ("warning_to_error", "caution"),
         SpriteLoop::Charging => ("charging_loop", "charge_start"),
         SpriteLoop::Presence => ("companion_presence", "presence_01"),
+        SpriteLoop::Success => ("success_celebration", "success_notice"),
+        SpriteLoop::Notification => ("notification_cycle", "message"),
+        SpriteLoop::Silly => ("silly_loop", "playful_grin"),
     };
     let root = match animation {
         SpriteLoop::Idle
@@ -501,7 +645,10 @@ fn frame_path(animation: SpriteLoop, frame: u8) -> PathBuf {
         | SpriteLoop::Thinking
         | SpriteLoop::Warning
         | SpriteLoop::Charging
-        | SpriteLoop::Presence => "assets/sprites/companion-v2",
+        | SpriteLoop::Presence
+        | SpriteLoop::Success
+        | SpriteLoop::Notification
+        | SpriteLoop::Silly => "assets/sprites/companion-v2",
         _ => "assets/sprites/clockwork-owl",
     };
     let filename = match animation {
@@ -547,12 +694,42 @@ fn frame_path(animation: SpriteLoop, frame: u8) -> PathBuf {
         ][frame as usize]
             .to_owned(),
         SpriteLoop::Presence => format!("{frame:02}_presence_{:02}.png", frame + 1),
+        SpriteLoop::Success => [
+            "00_success_notice.png",
+            "01_smile.png",
+            "02_hop.png",
+            "03_confetti.png",
+            "04_happy_wink.png",
+        ][frame as usize]
+            .to_owned(),
+        SpriteLoop::Notification => [
+            "00_message.png",
+            "01_reminder.png",
+            "02_mention.png",
+            "03_incoming_call.png",
+            "04_urgent_alert.png",
+        ][frame as usize]
+            .to_owned(),
+        SpriteLoop::Silly => [
+            "00_playful_grin.png",
+            "01_wink.png",
+            "02_tongue_out.png",
+            "03_goofy_tilt.png",
+            "04_grin_reset.png",
+        ][frame as usize]
+            .to_owned(),
         _ => format!("{prefix}_{frame:02}.png"),
     };
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join(root)
         .join(directory)
         .join(filename)
+}
+
+fn dispatch_task_event(event: crate::collectors::TaskEvent, life: &Rc<RefCell<PetLife>>) {
+    let event = task_event(event);
+    let _ = record(&event);
+    life.borrow_mut().trigger_reaction(animation_for(&event));
 }
 
 fn load_frame(animation: SpriteLoop, frame: u8) -> gdk_pixbuf::Pixbuf {
@@ -612,8 +789,11 @@ mod tests {
             music_playing: false,
             focus: None,
             warning_for: Duration::ZERO,
+            reaction: None,
             charging: false,
             locked: false,
+            idle: false,
+            fullscreen: false,
             rng: 1,
         };
 

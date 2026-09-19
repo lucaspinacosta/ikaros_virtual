@@ -14,3 +14,7 @@ The next settings panel will offer an opt-in focused-application signal through 
 - browsers: the owl continues normal roaming with less frequent alerts.
 
 Browser-tab details require a separate browser extension and an explicit `BrowserSummary` permission. No browser integration is enabled in the current build.
+
+## Desktop notifications
+
+Incoming session-bus notification capture is disabled unless the user starts Ikaros with `IKAROS_READ_NOTIFICATIONS=1`. It observes notification application, summary, and body through the local session bus; these event records are kept locally for at most seven days.

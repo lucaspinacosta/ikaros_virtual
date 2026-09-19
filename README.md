@@ -55,9 +55,14 @@ Explicit opt-in only:
 
 - selected files or directories, never the entire home directory by default
 - browser summaries through a browser extension and native messaging
+- incoming desktop-notification summaries (`IKAROS_READ_NOTIFICATIONS=1`)
 - allowlisted, reviewed commands
 
 Every approved action should be visible in an activity log and revocable in settings.
+
+For the current command-line configuration, set `IKAROS_WATCH_DIRECTORY` to one explicitly selected directory to enable its file/download watcher. Existing files are ignored during its first scan; a newly observed file produces a creation event and a completion event after two unchanged polling cycles.
+
+Firefox-family browsers, including Zen, use `browser-extension-firefox/`. Chromium-based browsers use `browser-extension/`.
 
 See `docs/capabilities.md` for the implemented local telemetry and the remaining opt-in integrations.
 

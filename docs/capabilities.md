@@ -13,7 +13,7 @@
 - UPower and NetworkManager event subscriptions to replace polling where practical;
 - opt-in Hyprland focused-application class detection for coding and browser modes, without window titles;
 - a browser extension using native messaging for explicit browser summaries;
-- selected-directory storage analysis and download monitoring;
+- selected-directory storage analysis and download monitoring (`IKAROS_WATCH_DIRECTORY`);
 - update summaries and user-defined, allowlisted maintenance actions.
 
 ## Boundaries

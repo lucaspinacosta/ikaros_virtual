@@ -22,11 +22,9 @@ pub fn read_status() -> SystemStatus {
     let meminfo = fs::read_to_string("/proc/meminfo").unwrap_or_default();
     let total = meminfo_value(&meminfo, "MemTotal:");
     let available = meminfo_value(&meminfo, "MemAvailable:");
-    let memory_used_percent = if total == 0 {
-        0
-    } else {
-        ((total.saturating_sub(available) * 100) / total) as u8
-    };
+    let memory_used_percent = (total.saturating_sub(available) * 100)
+        .checked_div(total)
+        .unwrap_or(0) as u8;
 
     SystemStatus {
         memory_used_percent,

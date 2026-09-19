@@ -45,6 +45,17 @@ pub fn focused_context() -> Option<FocusContext> {
     )
 }
 
+pub fn focused_fullscreen() -> Option<bool> {
+    if env::var("IKAROS_FOCUSED_APP_AWARENESS").ok().as_deref() != Some("1") {
+        return None;
+    }
+    let output = Command::new("hyprctl")
+        .args(["activewindow", "-j"])
+        .output()
+        .ok()?;
+    parse_fullscreen(&String::from_utf8_lossy(&output.stdout))
+}
+
 fn parse_window_class(json: &str) -> Option<&str> {
     let line = json
         .lines()
@@ -58,6 +69,21 @@ fn parse_window_class(json: &str) -> Option<&str> {
     )
 }
 
+fn parse_fullscreen(json: &str) -> Option<bool> {
+    let value = json
+        .lines()
+        .find(|line| line.trim_start().starts_with("\"fullscreen\""))?
+        .split(':')
+        .nth(1)?
+        .trim()
+        .trim_matches(',');
+    match value {
+        "true" => Some(true),
+        "false" => Some(false),
+        _ => None,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -66,5 +92,10 @@ mod tests {
     fn parses_only_the_active_window_class() {
         let json = "{\n  \"class\": \"code\",\n  \"title\": \"private file\"\n}";
         assert_eq!(parse_window_class(json), Some("code"));
+    }
+
+    #[test]
+    fn parses_fullscreen_without_reading_window_contents() {
+        assert_eq!(parse_fullscreen("{\n  \"fullscreen\": true\n}"), Some(true));
     }
 }

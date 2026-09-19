@@ -35,6 +35,9 @@ pub enum SpriteLoop {
     Warning,
     Charging,
     Presence,
+    Success,
+    Notification,
+    Silly,
 }
 
 impl SpriteLoop {
@@ -49,7 +52,7 @@ impl SpriteLoop {
             Self::Alert | Self::Flinch => 3,
             Self::Idle | Self::Party | Self::Working | Self::Thinking => 5,
             Self::Warning => 5,
-            Self::Charging | Self::Presence => 5,
+            Self::Charging | Self::Presence | Self::Success | Self::Notification | Self::Silly => 5,
         }
     }
 
@@ -61,7 +64,10 @@ impl SpriteLoop {
             Self::Idle | Self::Working | Self::Thinking => Duration::from_millis(250),
             Self::Party => Duration::from_millis(167),
             Self::Warning => Duration::from_millis(250),
-            Self::Charging | Self::Presence => Duration::from_millis(250),
+            Self::Charging | Self::Presence | Self::Notification | Self::Silly => {
+                Duration::from_millis(250)
+            }
+            Self::Success => Duration::from_millis(200),
             _ => Duration::from_millis(450),
         }
     }
@@ -198,6 +204,12 @@ pub struct Companion {
     permissions: Permissions,
     latest_snapshot: Option<SystemSnapshot>,
     last_memory_alert: Option<Duration>,
+}
+
+impl Default for Companion {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl Companion {
