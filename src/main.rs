@@ -1,3 +1,4 @@
+pub mod collectors;
 pub mod companion;
 pub mod context;
 pub mod events;

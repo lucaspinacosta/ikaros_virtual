@@ -9,6 +9,7 @@ use std::{
 use gtk::{gdk::prelude::SurfaceExt, glib, prelude::*};
 use gtk4_layer_shell::{Edge, KeyboardMode, Layer, LayerShell};
 
+use crate::collectors::{SessionEvent, session_event, session_locked};
 use crate::companion::{Companion, SpriteLoop};
 use crate::context::FocusContext;
 use crate::events::{EventKind, LocalEvent, record};
@@ -18,6 +19,7 @@ const OWL_SIZE_PX: i32 = 126;
 const SCREEN_MARGIN_PX: f64 = 16.0;
 const SIGNAL_POLL_INTERVAL: Duration = Duration::from_secs(2);
 const STATUS_POLL_INTERVAL: Duration = Duration::from_secs(15);
+const SESSION_POLL_INTERVAL: Duration = Duration::from_secs(5);
 
 pub fn run() {
     let app = gtk::Application::builder()
@@ -112,6 +114,8 @@ fn build_overlay(app: &gtk::Application) {
     let started_at = Instant::now();
     let last_status_poll = Rc::new(RefCell::new(started_at - STATUS_POLL_INTERVAL));
     let alert_engine = Rc::new(RefCell::new(AlertEngine::default()));
+    let last_session_poll = Rc::new(RefCell::new(started_at - SESSION_POLL_INTERVAL));
+    let locked = Rc::new(RefCell::new(None));
     glib::timeout_add_local(Duration::from_millis(50), {
         let companion = Rc::clone(&companion);
         let life = Rc::clone(&life);
@@ -120,10 +124,26 @@ fn build_overlay(app: &gtk::Application) {
         let canvas = canvas.clone();
         let last_status_poll = Rc::clone(&last_status_poll);
         let alert_engine = Rc::clone(&alert_engine);
+        let last_session_poll = Rc::clone(&last_session_poll);
+        let locked = Rc::clone(&locked);
         move || {
             let now = Instant::now();
             let elapsed = now.duration_since(*last_update.borrow());
             *last_update.borrow_mut() = now;
+
+            if now.duration_since(*last_session_poll.borrow()) >= SESSION_POLL_INTERVAL {
+                *last_session_poll.borrow_mut() = now;
+                if let Some(current) = session_locked() {
+                    let previous = locked.replace(Some(current));
+                    if previous != Some(current) {
+                        let _ = record(&session_event(if current {
+                            SessionEvent::Locked
+                        } else {
+                            SessionEvent::Unlocked
+                        }));
+                    }
+                }
+            }
 
             if now.duration_since(*last_status_poll.borrow()) >= STATUS_POLL_INTERVAL {
                 *last_status_poll.borrow_mut() = now;
@@ -163,6 +183,7 @@ fn build_overlay(app: &gtk::Application) {
             }
 
             let mut life = life.borrow_mut();
+            life.set_locked(locked.borrow().unwrap_or(false));
             life.update_music_signal(elapsed);
             let state = life.tick(elapsed, width, height);
             let mut companion = companion.borrow_mut();
@@ -230,6 +251,7 @@ struct PetLife {
     focus: Option<FocusContext>,
     warning_for: Duration,
     charging: bool,
+    locked: bool,
     rng: u64,
 }
 
@@ -247,6 +269,7 @@ impl Default for PetLife {
             focus: None,
             warning_for: Duration::ZERO,
             charging: false,
+            locked: false,
             rng: session_seed(),
         }
     }
@@ -270,6 +293,14 @@ impl PetLife {
                 x: self.x,
                 y: self.y,
                 animation: SpriteLoop::Party,
+            };
+        }
+
+        if self.locked {
+            return PetFrame {
+                x: self.x,
+                y: floor_y,
+                animation: SpriteLoop::Sleep,
             };
         }
 
@@ -347,6 +378,10 @@ impl PetLife {
     fn set_status(&mut self, focus: Option<FocusContext>, charging: bool) {
         self.focus = focus;
         self.charging = charging;
+    }
+
+    fn set_locked(&mut self, locked: bool) {
+        self.locked = locked;
     }
 
     fn trigger_warning(&mut self) {
@@ -578,6 +613,7 @@ mod tests {
             focus: None,
             warning_for: Duration::ZERO,
             charging: false,
+            locked: false,
             rng: 1,
         };
 
