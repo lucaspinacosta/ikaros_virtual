@@ -26,7 +26,7 @@ use crate::status::{
 use crate::{notifications::NotificationWatcher, routing::animation_for};
 
 const OWL_SIZE_PX: i32 = 90;
-const SCREEN_MARGIN_PX: f64 = 20.0;
+const SCREEN_MARGIN_PX: f64 = 24.0;
 const SIGNAL_POLL_INTERVAL: Duration = Duration::from_secs(2);
 const STATUS_POLL_INTERVAL: Duration = Duration::from_secs(10);
 const SESSION_POLL_INTERVAL: Duration = Duration::from_secs(5);

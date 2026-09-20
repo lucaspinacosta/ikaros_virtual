@@ -1,6 +1,6 @@
 # Ikaros Virtual
 
-Ikaros is a Linux-only pixel-art owl companion for this laptop. It roams while the desktop is active and returns to a bottom corner when idle. It observes selected system information and may perform only actions the user has explicitly approved.
+Ikaros is a Linux-only pixel-art owl companion for laptop. It roams while the desktop is active and returns to a bottom corner when idle. It observes selected system information and may perform only actions the user has explicitly approved.
 
 ## Current slice
 
@@ -25,7 +25,7 @@ cargo test
 The systemd user unit is stored at `systemd/ikaros-virtual.service`. After building the release binary, enable it with:
 
 ```bash
-systemctl --user enable --now /home/lucaspinacosta/.Applications/ikaros_virtual/systemd/ikaros-virtual.service
+systemctl --user enable --now /home/$USER/ikaros_virtual/systemd/ikaros-virtual.service
 ```
 
 Check it with `systemctl --user status ikaros-virtual.service`. Disable automatic startup with `systemctl --user disable --now ikaros-virtual.service`.

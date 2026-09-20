@@ -8,10 +8,10 @@ fn main() {
             eprintln!("Ikaros configuration failed: {error}");
             std::process::exit(2);
         }
-    } else if arguments.iter().any(|argument| argument == "--native-host") {
-        if let Err(error) = ikaros_virtual::browser::run_native_host() {
-            eprintln!("Ikaros native host failed: {error}");
-        }
+    // } else if arguments.iter().any(|argument| argument == "--native-host") {
+    //    if let Err(error) = ikaros_virtual::browser::run_native_host() {
+    //        eprintln!("Ikaros native host failed: {error}");
+    //    }
     } else if arguments
         .iter()
         .any(|argument| argument == "--status" || argument == "--settings")
