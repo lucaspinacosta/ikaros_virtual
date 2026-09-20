@@ -26,10 +26,12 @@ use crate::status::{
 use crate::{notifications::NotificationWatcher, routing::animation_for};
 
 const OWL_SIZE_PX: i32 = 84;
-const SCREEN_MARGIN_PX: f64 = 16.0;
+const SCREEN_MARGIN_PX: f64 = 20.0;
 const SIGNAL_POLL_INTERVAL: Duration = Duration::from_secs(2);
-const STATUS_POLL_INTERVAL: Duration = Duration::from_secs(15);
+const STATUS_POLL_INTERVAL: Duration = Duration::from_secs(10);
 const SESSION_POLL_INTERVAL: Duration = Duration::from_secs(5);
+const MUSIC_DANCE_DURATION: Duration = Duration::from_secs(5);
+const MUSIC_DANCE_CYCLE: Duration = Duration::from_secs(90);
 
 pub fn run() {
     let app = gtk::Application::builder()
@@ -552,6 +554,7 @@ struct PetLife {
     mode_duration: Duration,
     signal_elapsed: Duration,
     music_playing: bool,
+    music_elapsed: Duration,
     focus: Option<FocusContext>,
     warning_for: Duration,
     reaction: Option<(SpriteLoop, Duration)>,
@@ -575,6 +578,7 @@ impl Default for PetLife {
             mode_duration: Duration::from_secs(3),
             signal_elapsed: SIGNAL_POLL_INTERVAL,
             music_playing: false,
+            music_elapsed: Duration::ZERO,
             focus: None,
             warning_for: Duration::ZERO,
             reaction: None,
@@ -598,6 +602,12 @@ impl PetLife {
             self.initialized = true;
         }
 
+        if self.music_playing {
+            self.music_elapsed += elapsed;
+        } else {
+            self.music_elapsed = Duration::ZERO;
+        }
+
         if self.locked || self.idle {
             return PetFrame {
                 x: self.x,
@@ -611,18 +621,6 @@ impl PetLife {
                 x: self.x,
                 y: floor_y,
                 animation: SpriteLoop::Perch,
-            };
-        }
-
-        if self.music_playing {
-            self.mode = PetMode::Dance;
-            self.mode_elapsed += elapsed;
-            let beat = (self.mode_elapsed.as_secs_f64() * 9.0).sin();
-            self.y = floor_y - beat.abs() * 10.0;
-            return PetFrame {
-                x: self.x,
-                y: self.y,
-                animation: SpriteLoop::Party,
             };
         }
 
@@ -642,6 +640,21 @@ impl PetLife {
                 x: self.x,
                 y: self.y,
                 animation: SpriteLoop::Warning,
+            };
+        }
+
+        if self.music_playing
+            && self.music_elapsed.as_millis() % MUSIC_DANCE_CYCLE.as_millis()
+                < MUSIC_DANCE_DURATION.as_millis()
+        {
+            self.mode = PetMode::Dance;
+            self.mode_elapsed += elapsed;
+            let beat = (self.mode_elapsed.as_secs_f64() * 9.0).sin();
+            self.y = floor_y - beat.abs() * 10.0;
+            return PetFrame {
+                x: self.x,
+                y: self.y,
+                animation: SpriteLoop::Party,
             };
         }
 
@@ -995,6 +1008,7 @@ mod tests {
             mode_duration: Duration::from_secs(2),
             signal_elapsed: Duration::ZERO,
             music_playing: false,
+            music_elapsed: Duration::ZERO,
             focus: None,
             warning_for: Duration::ZERO,
             reaction: None,
@@ -1016,6 +1030,19 @@ mod tests {
         let frame = load_frame(SpriteLoop::Perch, 0);
         assert_eq!(frame.width(), OWL_SIZE_PX);
         assert_eq!(frame.height(), OWL_SIZE_PX);
+    }
+
+    #[test]
+    fn music_dance_is_an_accent_not_a_permanent_override() {
+        let mut life = PetLife {
+            music_playing: true,
+            music_elapsed: Duration::from_secs(6),
+            ..PetLife::default()
+        };
+        assert_ne!(
+            life.tick(Duration::ZERO, 1000.0, 800.0).animation,
+            SpriteLoop::Party
+        );
     }
 
     #[test]
