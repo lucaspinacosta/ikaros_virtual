@@ -64,6 +64,22 @@ For the current command-line configuration, set `IKAROS_WATCH_DIRECTORY` to one 
 
 Firefox-family browsers, including Zen, use `browser-extension-firefox/`. Chromium-based browsers use `browser-extension/`.
 
+## Local awareness setup
+
+Open the GTK settings window with `cargo run --bin ikaros-virtual -- --settings` during development, or `ikaros-virtual --settings` after installation. It configures all local source toggles and paths: calendar, selected directory watcher, notification capture, Hyprland focus/fullscreen awareness, systemd units, routines, breaks, quiet hours, and reaction pause.
+
+The command-line form remains available for scripting:
+
+```bash
+ikaros-virtual --configure --calendar /path/to/calendar.ics
+ikaros-virtual --configure --watch-unit backup.service
+ikaros-virtual --configure --routine "Wrap up" 17:30
+ikaros-virtual --configure --break-minutes 60
+ikaros-virtual --configure --quiet-hours 22 7
+```
+
+The selected calendar reader only announces events due within five minutes and never stores event titles. Unit tracking only polls the explicitly named systemd user units. Use `ikaros-virtual --configure --pause-hour` or the status panel to suppress reactions temporarily.
+
 See `docs/capabilities.md` for the implemented local telemetry and the remaining opt-in integrations.
 
 ## Next implementation steps

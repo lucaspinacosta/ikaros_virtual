@@ -3,6 +3,7 @@ name = "ikaros-virtual"
 version = "0.1.0"
 edition = "2024"
 description = "A permission-gated Linux desktop owl companion"
+default-run = "ikaros-virtual"
 
 [dependencies]
 chrono = { version = "0.4", default-features = false, features = ["clock"] }

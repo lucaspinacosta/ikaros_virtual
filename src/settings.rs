@@ -1,5 +1,8 @@
+#[cfg(unix)]
+use std::os::unix::fs::{OpenOptionsExt, PermissionsExt};
 use std::{
-    fs,
+    fs::{self, OpenOptions},
+    io::Write,
     path::PathBuf,
     time::{SystemTime, UNIX_EPOCH},
 };
@@ -9,11 +12,14 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct Settings {
     pub calendar_path: Option<PathBuf>,
+    pub watch_directory: Option<PathBuf>,
     pub watched_units: Vec<String>,
     pub routines: Vec<Routine>,
     pub break_reminder_minutes: Option<u64>,
     pub quiet_hours: Option<QuietHours>,
     pub paused_until_unix_secs: Option<u64>,
+    pub read_notifications: bool,
+    pub focused_app_awareness: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -41,11 +47,15 @@ impl Settings {
         let path = settings_path();
         if let Some(parent) = path.parent() {
             fs::create_dir_all(parent)?;
+            set_owner_only_permissions(parent, 0o700)?;
         }
-        fs::write(
-            path,
-            serde_json::to_vec_pretty(self).expect("settings are serializable"),
-        )
+        let mut options = OpenOptions::new();
+        options.create(true).truncate(true).write(true);
+        #[cfg(unix)]
+        options.mode(0o600);
+        let mut file = options.open(&path)?;
+        set_owner_only_permissions(&path, 0o600)?;
+        file.write_all(&serde_json::to_vec_pretty(self).expect("settings are serializable"))
     }
 
     pub fn reactions_paused(&self) -> bool {
@@ -56,6 +66,14 @@ impl Settings {
     pub fn pause_for_one_hour(&mut self) {
         self.paused_until_unix_secs = Some(now_unix_secs() + 60 * 60);
     }
+}
+
+fn set_owner_only_permissions(path: &std::path::Path, mode: u32) -> std::io::Result<()> {
+    #[cfg(unix)]
+    fs::set_permissions(path, fs::Permissions::from_mode(mode))?;
+    #[cfg(not(unix))]
+    let _ = (path, mode);
+    Ok(())
 }
 
 pub fn settings_path() -> PathBuf {

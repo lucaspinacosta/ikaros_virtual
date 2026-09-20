@@ -19,6 +19,10 @@ pub struct SystemStatus {
 }
 
 pub fn read_status() -> SystemStatus {
+    read_status_with_focus(focused_context())
+}
+
+pub fn read_status_with_focus(focus: Option<FocusContext>) -> SystemStatus {
     let meminfo = fs::read_to_string("/proc/meminfo").unwrap_or_default();
     let total = meminfo_value(&meminfo, "MemTotal:");
     let available = meminfo_value(&meminfo, "MemAvailable:");
@@ -34,7 +38,7 @@ pub fn read_status() -> SystemStatus {
         disk_available_gib: disk_available_gib(),
         battery: battery_status(),
         network_connected: network_connected(),
-        focus: focused_context(),
+        focus,
     }
 }
 

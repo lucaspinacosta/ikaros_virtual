@@ -18,7 +18,11 @@ impl FocusContext {
 }
 
 pub fn focused_context() -> Option<FocusContext> {
-    if env::var("IKAROS_FOCUSED_APP_AWARENESS").ok().as_deref() != Some("1") {
+    focused_context_when(env::var("IKAROS_FOCUSED_APP_AWARENESS").ok().as_deref() == Some("1"))
+}
+
+pub fn focused_context_when(enabled: bool) -> Option<FocusContext> {
+    if !enabled {
         return None;
     }
     let output = Command::new("hyprctl")
@@ -46,7 +50,11 @@ pub fn focused_context() -> Option<FocusContext> {
 }
 
 pub fn focused_fullscreen() -> Option<bool> {
-    if env::var("IKAROS_FOCUSED_APP_AWARENESS").ok().as_deref() != Some("1") {
+    focused_fullscreen_when(env::var("IKAROS_FOCUSED_APP_AWARENESS").ok().as_deref() == Some("1"))
+}
+
+pub fn focused_fullscreen_when(enabled: bool) -> Option<bool> {
+    if !enabled {
         return None;
     }
     let output = Command::new("hyprctl")

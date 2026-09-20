@@ -17,10 +17,12 @@ use crate::collectors::{
     notification_event, session_event, session_idle, session_locked, task_event,
 };
 use crate::companion::{Companion, SpriteLoop};
-use crate::context::{FocusContext, focused_fullscreen};
+use crate::context::{FocusContext, focused_fullscreen_when};
 use crate::events::{EventKind, EventStore, LocalEvent, event_log_path, record};
 use crate::settings::Settings;
-use crate::status::{AlertEngine, format_status, read_status, send_notification};
+use crate::status::{
+    AlertEngine, format_status, read_status, read_status_with_focus, send_notification,
+};
 use crate::{notifications::NotificationWatcher, routing::animation_for};
 
 const OWL_SIZE_PX: i32 = 84;
@@ -48,20 +50,60 @@ pub fn run_status_panel() {
 fn build_status_panel(app: &gtk::Application) {
     let window = gtk::ApplicationWindow::builder()
         .application(app)
-        .title("Ikaros Status")
-        .default_width(360)
-        .default_height(300)
+        .title("Ikaros Settings")
+        .default_width(620)
+        .default_height(680)
         .build();
-    let content = gtk::Box::new(gtk::Orientation::Vertical, 12);
+    let content = gtk::Box::new(gtk::Orientation::Vertical, 10);
     content.set_margin_top(18);
     content.set_margin_bottom(18);
     content.set_margin_start(18);
     content.set_margin_end(18);
-    let title = gtk::Label::new(Some("Ikaros is watching locally"));
+    let title = gtk::Label::new(Some("Ikaros local awareness settings"));
     title.add_css_class("title-2");
     title.set_xalign(0.0);
     let status = gtk::Label::new(Some(&format_status(&read_status())));
     status.set_xalign(0.0);
+    status.set_selectable(true);
+    let settings = Settings::load();
+    let calendar_path = entry_row("Calendar (.ics) path", settings.calendar_path.as_ref());
+    let watch_directory = entry_row("Watched directory path", settings.watch_directory.as_ref());
+    let notifications = gtk::Switch::new();
+    notifications.set_active(settings.read_notifications);
+    let focus_awareness = gtk::Switch::new();
+    focus_awareness.set_active(settings.focused_app_awareness);
+    let break_minutes = gtk::SpinButton::with_range(0.0, 480.0, 5.0);
+    break_minutes.set_value(settings.break_reminder_minutes.unwrap_or(0) as f64);
+    let quiet_enabled = gtk::Switch::new();
+    quiet_enabled.set_active(settings.quiet_hours.is_some());
+    let quiet_start = gtk::SpinButton::with_range(0.0, 23.0, 1.0);
+    let quiet_end = gtk::SpinButton::with_range(0.0, 23.0, 1.0);
+    quiet_start.set_value(
+        settings
+            .quiet_hours
+            .map_or(22.0, |hours| hours.start_hour as f64),
+    );
+    quiet_end.set_value(
+        settings
+            .quiet_hours
+            .map_or(7.0, |hours| hours.end_hour as f64),
+    );
+    let units = gtk::TextView::new();
+    units.set_monospace(true);
+    units.buffer().set_text(&settings.watched_units.join("\n"));
+    let routines = gtk::TextView::new();
+    routines.set_monospace(true);
+    routines.buffer().set_text(
+        &settings
+            .routines
+            .iter()
+            .map(|routine| format!("{}@{:02}:{:02}", routine.name, routine.hour, routine.minute))
+            .collect::<Vec<_>>()
+            .join("\n"),
+    );
+    let saved = gtk::Label::new(None);
+    saved.set_xalign(0.0);
+    saved.add_css_class("dim-label");
     let monitor = gtk::Button::with_label("Open System Monitor");
     monitor.connect_clicked(|_| {
         let _ = Command::new("gnome-system-monitor").spawn();
@@ -72,16 +114,178 @@ fn build_status_panel(app: &gtk::Application) {
         settings.pause_for_one_hour();
         let _ = settings.save();
     });
+    let save = gtk::Button::with_label("Save settings");
+    save.add_css_class("suggested-action");
+    save.connect_clicked({
+        let calendar_path = calendar_path.clone();
+        let watch_directory = watch_directory.clone();
+        let notifications = notifications.clone();
+        let focus_awareness = focus_awareness.clone();
+        let break_minutes = break_minutes.clone();
+        let quiet_enabled = quiet_enabled.clone();
+        let quiet_start = quiet_start.clone();
+        let quiet_end = quiet_end.clone();
+        let units = units.clone();
+        let routines = routines.clone();
+        let saved = saved.clone();
+        move |_| {
+            let routines_text = text_view_text(&routines);
+            let routines = match parse_routines(&routines_text) {
+                Ok(routines) => routines,
+                Err(error) => {
+                    saved.set_text(&error);
+                    return;
+                }
+            };
+            let mut settings = Settings::load();
+            settings.calendar_path = path_from_entry(&calendar_path);
+            settings.watch_directory = path_from_entry(&watch_directory);
+            settings.read_notifications = notifications.is_active();
+            settings.focused_app_awareness = focus_awareness.is_active();
+            settings.break_reminder_minutes =
+                (break_minutes.value_as_int() > 0).then_some(break_minutes.value_as_int() as u64);
+            settings.quiet_hours =
+                quiet_enabled
+                    .is_active()
+                    .then_some(crate::settings::QuietHours {
+                        start_hour: quiet_start.value_as_int() as u8,
+                        end_hour: quiet_end.value_as_int() as u8,
+                    });
+            settings.watched_units = text_view_text(&units)
+                .lines()
+                .map(str::trim)
+                .filter(|unit| !unit.is_empty())
+                .map(str::to_owned)
+                .collect();
+            settings.routines = routines;
+            match settings.save() {
+                Ok(()) => saved.set_text(
+                    "Saved. Restart the companion to apply source-path and watcher changes.",
+                ),
+                Err(error) => saved.set_text(&format!("Could not save settings: {error}")),
+            }
+        }
+    });
     content.append(&title);
     content.append(&status);
+    content.append(&labeled_row(
+        "Read incoming desktop notifications",
+        &notifications,
+    ));
+    content.append(&labeled_row(
+        "Focused application and fullscreen awareness",
+        &focus_awareness,
+    ));
+    content.append(&labeled_row(
+        "Break reminder (minutes, 0 disables)",
+        &break_minutes,
+    ));
+    content.append(&labeled_row("Enable quiet hours", &quiet_enabled));
+    content.append(&labeled_row("Quiet hours start (0-23)", &quiet_start));
+    content.append(&labeled_row("Quiet hours end (0-23)", &quiet_end));
+    content.append(&calendar_path);
+    content.append(&watch_directory);
+    content.append(&section("Systemd user units (one per line)", &units));
+    content.append(&section(
+        "Manual routines: Name@HH:MM (one per line)",
+        &routines,
+    ));
+    let browser_note = gtk::Label::new(Some(
+        "Browser sharing is enabled in the Ikaros browser extension's own preferences.",
+    ));
+    browser_note.set_wrap(true);
+    browser_note.set_xalign(0.0);
+    browser_note.add_css_class("dim-label");
+    content.append(&browser_note);
     content.append(&monitor);
     content.append(&pause);
-    window.set_child(Some(&content));
+    content.append(&save);
+    content.append(&saved);
+    let scroll = gtk::ScrolledWindow::builder()
+        .child(&content)
+        .vexpand(true)
+        .build();
+    window.set_child(Some(&scroll));
     window.present();
     glib::timeout_add_local(Duration::from_secs(5), move || {
         status.set_text(&format_status(&read_status()));
         glib::ControlFlow::Continue
     });
+}
+
+fn entry_row(label: &str, value: Option<&PathBuf>) -> gtk::Box {
+    let entry = gtk::Entry::new();
+    entry.set_hexpand(true);
+    entry.set_text(value.and_then(|path| path.to_str()).unwrap_or_default());
+    labeled_row(label, &entry)
+}
+
+fn labeled_row(label: &str, widget: &impl IsA<gtk::Widget>) -> gtk::Box {
+    let row = gtk::Box::new(gtk::Orientation::Horizontal, 12);
+    let label = gtk::Label::new(Some(label));
+    label.set_xalign(0.0);
+    label.set_hexpand(true);
+    row.append(&label);
+    row.append(widget);
+    row
+}
+
+fn section(label: &str, widget: &impl IsA<gtk::Widget>) -> gtk::Box {
+    let section = gtk::Box::new(gtk::Orientation::Vertical, 4);
+    let label = gtk::Label::new(Some(label));
+    label.set_xalign(0.0);
+    section.append(&label);
+    widget.set_size_request(-1, 72);
+    section.append(widget);
+    section
+}
+
+fn path_from_entry(row: &gtk::Box) -> Option<PathBuf> {
+    row.last_child()?
+        .downcast::<gtk::Entry>()
+        .ok()
+        .and_then(|entry| {
+            let value = entry.text();
+            (!value.is_empty()).then(|| PathBuf::from(value.as_str()))
+        })
+}
+
+fn text_view_text(view: &gtk::TextView) -> String {
+    let buffer = view.buffer();
+    buffer
+        .text(&buffer.start_iter(), &buffer.end_iter(), false)
+        .to_string()
+}
+
+fn parse_routines(value: &str) -> Result<Vec<crate::settings::Routine>, String> {
+    value
+        .lines()
+        .filter(|line| !line.trim().is_empty())
+        .map(|line| {
+            let (name, time) = line
+                .split_once('@')
+                .ok_or_else(|| "Routines must use Name@HH:MM".to_owned())?;
+            let (hour, minute) = time
+                .split_once(':')
+                .ok_or_else(|| "Routine times must use HH:MM".to_owned())?;
+            let hour = hour
+                .trim()
+                .parse::<u8>()
+                .map_err(|_| "Routine hour must be 0-23".to_owned())?;
+            let minute = minute
+                .trim()
+                .parse::<u8>()
+                .map_err(|_| "Routine minute must be 0-59".to_owned())?;
+            if name.trim().is_empty() || hour > 23 || minute > 59 {
+                return Err("Routine name or time is invalid".to_owned());
+            }
+            Ok(crate::settings::Routine {
+                name: name.trim().to_owned(),
+                hour,
+                minute,
+            })
+        })
+        .collect()
 }
 
 fn build_overlay(app: &gtk::Application) {
@@ -145,17 +349,17 @@ fn build_overlay(app: &gtk::Application) {
     let unit_watcher = Rc::new(RefCell::new(SystemdUnitWatcher::new(
         settings.watched_units.clone(),
     )));
-    let file_watcher = std::env::var_os("IKAROS_WATCH_DIRECTORY")
-        .map(PathBuf::from)
+    let file_watcher = settings
+        .watch_directory
+        .clone()
         .map(FileWatcher::new)
         .map(RefCell::new);
     let (notification_sender, notification_receiver) = mpsc::sync_channel(64);
     // The monitor is best-effort: desktop use continues when dbus-monitor is unavailable.
-    let notification_watcher = std::env::var("IKAROS_READ_NOTIFICATIONS")
-        .ok()
-        .as_deref()
-        .filter(|value| *value == "1")
-        .and_then(|_| NotificationWatcher::start(notification_sender).ok());
+    let notification_watcher = settings
+        .read_notifications
+        .then(|| NotificationWatcher::start(notification_sender).ok())
+        .flatten();
     glib::timeout_add_local(Duration::from_millis(50), {
         let companion = Rc::clone(&companion);
         let life = Rc::clone(&life);
@@ -211,8 +415,10 @@ fn build_overlay(app: &gtk::Application) {
             if now.duration_since(*last_status_poll.borrow()) >= STATUS_POLL_INTERVAL {
                 *last_status_poll.borrow_mut() = now;
                 let _ = EventStore::at(event_log_path()).prune();
-                let status = read_status();
                 let settings = Settings::load();
+                let status = read_status_with_focus(crate::context::focused_context_when(
+                    settings.focused_app_awareness,
+                ));
                 life.borrow_mut().set_preferences(
                     settings.reactions_paused(),
                     settings.quiet_hours.is_some_and(|quiet_hours| {
@@ -231,8 +437,9 @@ fn build_overlay(app: &gtk::Application) {
                         .as_ref()
                         .is_some_and(|battery| battery.charging),
                 );
-                life.borrow_mut()
-                    .set_fullscreen(focused_fullscreen().unwrap_or(false));
+                life.borrow_mut().set_fullscreen(
+                    focused_fullscreen_when(settings.focused_app_awareness).unwrap_or(false),
+                );
                 if let Some(focus) = status.focus {
                     let _ = record(&LocalEvent {
                         kind: EventKind::Activity,
@@ -795,6 +1002,8 @@ mod tests {
             locked: false,
             idle: false,
             fullscreen: false,
+            paused: false,
+            quiet: false,
             rng: 1,
         };
 
@@ -807,5 +1016,24 @@ mod tests {
         let frame = load_frame(SpriteLoop::Perch, 0);
         assert_eq!(frame.width(), OWL_SIZE_PX);
         assert_eq!(frame.height(), OWL_SIZE_PX);
+    }
+
+    #[test]
+    fn parses_routines_from_settings_text() {
+        assert_eq!(
+            parse_routines("Wrap up@17:30\nBreak@09:05").unwrap(),
+            vec![
+                crate::settings::Routine {
+                    name: "Wrap up".to_owned(),
+                    hour: 17,
+                    minute: 30,
+                },
+                crate::settings::Routine {
+                    name: "Break".to_owned(),
+                    hour: 9,
+                    minute: 5,
+                },
+            ]
+        );
     }
 }

@@ -12,7 +12,10 @@ fn main() {
         if let Err(error) = ikaros_virtual::browser::run_native_host() {
             eprintln!("Ikaros native host failed: {error}");
         }
-    } else if arguments.iter().any(|argument| argument == "--status") {
+    } else if arguments
+        .iter()
+        .any(|argument| argument == "--status" || argument == "--settings")
+    {
         ikaros_virtual::overlay::run_status_panel();
     } else {
         ikaros_virtual::overlay::run();
@@ -39,7 +42,19 @@ fn configure(arguments: &[String]) -> Result<(), String> {
             settings.break_reminder_minutes = Some(minutes.parse().map_err(|_| "break minutes must be a whole number")?);
         }
         [option, start, end] if option == "--quiet-hours" => {
-            settings.quiet_hours = Some(QuietHours { start_hour: start.parse().map_err(|_| "quiet-hour start must be 0-23")?, end_hour: end.parse().map_err(|_| "quiet-hour end must be 0-23")? });
+            let start_hour = start
+                .parse::<u8>()
+                .map_err(|_| "quiet-hour start must be 0-23")?;
+            let end_hour = end
+                .parse::<u8>()
+                .map_err(|_| "quiet-hour end must be 0-23")?;
+            if start_hour > 23 || end_hour > 23 {
+                return Err("quiet hours must use values from 0 to 23".to_owned());
+            }
+            settings.quiet_hours = Some(QuietHours {
+                start_hour,
+                end_hour,
+            });
         }
         [option] if option == "--pause-hour" => settings.pause_for_one_hour(),
         [option] if option == "--resume" => settings.paused_until_unix_secs = None,

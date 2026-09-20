@@ -26,7 +26,7 @@ impl CalendarWatcher {
         let mut events = Vec::new();
         for start in contents.lines().filter_map(parse_start) {
             let seconds = start.signed_duration_since(now).num_seconds();
-            if (0..=300).contains(&seconds) && self.announced.insert(start.timestamp()) {
+            if (-60..=300).contains(&seconds) && self.announced.insert(start.timestamp()) {
                 events.push(TaskEvent::Started("Calendar event starts soon".to_owned()));
             }
         }
