@@ -520,7 +520,10 @@ fn apply_animation(companion: &mut Companion, animation: SpriteLoop) {
         | SpriteLoop::Presence
         | SpriteLoop::Success
         | SpriteLoop::Notification
-        | SpriteLoop::Silly => companion.set_visual_animation(animation),
+        | SpriteLoop::Silly
+        | SpriteLoop::Emotion
+        | SpriteLoop::SleepWake
+        | SpriteLoop::Compile => companion.set_visual_animation(animation),
     }
 }
 
@@ -564,6 +567,7 @@ struct PetLife {
     fullscreen: bool,
     paused: bool,
     quiet: bool,
+    playful_for: Duration,
     rng: u64,
 }
 
@@ -588,6 +592,7 @@ impl Default for PetLife {
             fullscreen: false,
             paused: false,
             quiet: false,
+            playful_for: Duration::ZERO,
             rng: session_seed(),
         }
     }
@@ -640,6 +645,15 @@ impl PetLife {
                 x: self.x,
                 y: self.y,
                 animation: SpriteLoop::Warning,
+            };
+        }
+
+        self.playful_for = self.playful_for.saturating_sub(elapsed);
+        if self.playful_for > Duration::ZERO {
+            return PetFrame {
+                x: self.x,
+                y: floor_y,
+                animation: SpriteLoop::Silly,
             };
         }
 
@@ -762,6 +776,9 @@ impl PetLife {
         self.mode = match self.next_random() % 100 {
             0..35 => {
                 self.mode_duration = Duration::from_secs(2 + self.next_random() % 5);
+                if self.next_random() % 100 < 12 {
+                    self.playful_for = Duration::from_secs(3);
+                }
                 PetMode::Rest
             }
             35..70 => {
@@ -851,7 +868,10 @@ fn frame_path(animation: SpriteLoop, frame: u8) -> PathBuf {
         | SpriteLoop::Presence
         | SpriteLoop::Success
         | SpriteLoop::Notification
-        | SpriteLoop::Silly => "assets/sprites/companion-v2",
+        | SpriteLoop::Silly
+        | SpriteLoop::Emotion
+        | SpriteLoop::SleepWake
+        | SpriteLoop::Compile => "assets/sprites/companion-v2",
         _ => "assets/sprites/clockwork-owl",
     };
     let (directory, filename) = match animation {
@@ -960,6 +980,37 @@ fn frame_path(animation: SpriteLoop, frame: u8) -> PathBuf {
             ][frame as usize]
                 .to_owned(),
         ),
+        SpriteLoop::Emotion => (
+            "emotion_cycle",
+            [
+                "00_neutral.png",
+                "01_shy.png",
+                "02_confused.png",
+                "03_sad.png",
+                "04_determined.png",
+            ][frame as usize]
+                .to_owned(),
+        ),
+        SpriteLoop::SleepWake => (
+            "sleep_to_wake",
+            [
+                "00_drowsy.png",
+                "01_sleep.png",
+                "02_deep_sleep.png",
+                "03_stir.png",
+                "04_wake.png",
+            ][frame as usize]
+                .to_owned(),
+        ),
+        SpriteLoop::Compile => (
+            "compile_code",
+            [
+                "00_compiling_01.png",
+                "01_completed_02.png",
+                "02_success.png",
+            ][frame as usize]
+                .to_owned(),
+        ),
         SpriteLoop::Perch | SpriteLoop::Blink => {
             ("perch_blink", format!("perch_blink_{frame:02}.png"))
         }
@@ -1048,6 +1099,7 @@ mod tests {
             fullscreen: false,
             paused: false,
             quiet: false,
+            playful_for: Duration::ZERO,
             rng: 1,
         };
 
@@ -1068,6 +1120,9 @@ mod tests {
             SpriteLoop::Success,
             SpriteLoop::Notification,
             SpriteLoop::Silly,
+            SpriteLoop::Emotion,
+            SpriteLoop::SleepWake,
+            SpriteLoop::Compile,
         ];
 
         for animation in animations {
@@ -1097,6 +1152,18 @@ mod tests {
         assert_ne!(
             life.tick(Duration::ZERO, 1000.0, 800.0).animation,
             SpriteLoop::Party
+        );
+    }
+
+    #[test]
+    fn playful_moments_use_the_silly_animation() {
+        let mut life = PetLife {
+            playful_for: Duration::from_secs(2),
+            ..PetLife::default()
+        };
+        assert_eq!(
+            life.tick(Duration::ZERO, 1000.0, 800.0).animation,
+            SpriteLoop::Silly
         );
     }
 

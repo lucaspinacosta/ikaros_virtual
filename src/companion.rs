@@ -38,6 +38,9 @@ pub enum SpriteLoop {
     Success,
     Notification,
     Silly,
+    Emotion,
+    SleepWake,
+    Compile,
 }
 
 impl SpriteLoop {
@@ -47,13 +50,18 @@ impl SpriteLoop {
             Self::Blink => 4,
             Self::Sleep => 4,
             Self::Idle | Self::Warning | Self::Success => 4,
-            Self::Working => 3,
+            Self::Working | Self::Compile => 3,
             Self::WalkLeft => 8,
             Self::WalkRight => 4,
             Self::Fly => 4,
             Self::Alert | Self::Flinch => 3,
             Self::Party | Self::Thinking => 5,
-            Self::Charging | Self::Presence | Self::Notification | Self::Silly => 5,
+            Self::Charging
+            | Self::Presence
+            | Self::Notification
+            | Self::Silly
+            | Self::Emotion
+            | Self::SleepWake => 5,
         }
     }
 
@@ -63,12 +71,14 @@ impl SpriteLoop {
             Self::WalkLeft | Self::WalkRight => Duration::from_millis(140),
             Self::Alert | Self::Flinch => Duration::from_millis(110),
             Self::Idle | Self::Thinking => Duration::from_millis(250),
-            Self::Working | Self::Success | Self::Notification | Self::Silly => {
+            Self::Working | Self::Compile | Self::Success | Self::Notification | Self::Silly => {
                 Duration::from_millis(200)
             }
             Self::Party => Duration::from_millis(167),
             Self::Warning => Duration::from_millis(110),
-            Self::Charging | Self::Presence => Duration::from_millis(250),
+            Self::Charging | Self::Presence | Self::Emotion | Self::SleepWake => {
+                Duration::from_millis(250)
+            }
             _ => Duration::from_millis(450),
         }
     }
