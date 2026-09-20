@@ -46,13 +46,14 @@ impl SpriteLoop {
             Self::Perch => 4,
             Self::Blink => 4,
             Self::Sleep => 4,
+            Self::Idle | Self::Warning | Self::Success => 4,
+            Self::Working => 3,
             Self::WalkLeft => 8,
             Self::WalkRight => 4,
             Self::Fly => 4,
             Self::Alert | Self::Flinch => 3,
-            Self::Idle | Self::Party | Self::Working | Self::Thinking => 5,
-            Self::Warning => 5,
-            Self::Charging | Self::Presence | Self::Success | Self::Notification | Self::Silly => 5,
+            Self::Party | Self::Thinking => 5,
+            Self::Charging | Self::Presence | Self::Notification | Self::Silly => 5,
         }
     }
 
@@ -61,13 +62,13 @@ impl SpriteLoop {
             Self::Fly => Duration::from_millis(80),
             Self::WalkLeft | Self::WalkRight => Duration::from_millis(140),
             Self::Alert | Self::Flinch => Duration::from_millis(110),
-            Self::Idle | Self::Working | Self::Thinking => Duration::from_millis(250),
-            Self::Party => Duration::from_millis(167),
-            Self::Warning => Duration::from_millis(250),
-            Self::Charging | Self::Presence | Self::Notification | Self::Silly => {
-                Duration::from_millis(250)
+            Self::Idle | Self::Thinking => Duration::from_millis(250),
+            Self::Working | Self::Success | Self::Notification | Self::Silly => {
+                Duration::from_millis(200)
             }
-            Self::Success => Duration::from_millis(200),
+            Self::Party => Duration::from_millis(167),
+            Self::Warning => Duration::from_millis(110),
+            Self::Charging | Self::Presence => Duration::from_millis(250),
             _ => Duration::from_millis(450),
         }
     }

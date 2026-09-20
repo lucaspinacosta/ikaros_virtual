@@ -1,0 +1,74 @@
+{
+  "pack": "companion-v2",
+  "format": "RGBA_8888",
+  "frame_size": [256, 256],
+  "sequence_count": 13,
+  "total_frames": 58,
+  "sequences": {
+    "charging_loop": {
+      "frame_duration_ms": 250,
+      "loop": true,
+      "frames": ["00_charge_start.png", "01_charge_build.png", "02_charge_peak.png", "03_charge_hold.png", "04_charge_reset.png"]
+    },
+    "companion_presence": {
+      "frame_duration_ms": 250,
+      "loop": true,
+      "frames": ["00_present_01.png", "01_present_02.png", "02_present_03.png", "03_present_04.png", "04_present_return.png"]
+    },
+    "compile_code": {
+      "frame_duration_ms": 200,
+      "loop": false,
+      "frames": ["00_compiling_01.png", "01_completed_02.png", "02_success.png"]
+    },
+    "emotion_cycle": {
+      "frame_duration_ms": 250,
+      "loop": true,
+      "frames": ["00_neutral.png", "01_shy.png", "02_confused.png", "03_sad.png", "04_determined.png"]
+    },
+    "fun_party_loop": {
+      "frame_duration_ms": 167,
+      "loop": true,
+      "frames": ["00_dance_start.png", "01_dance_move.png", "02_spin.png", "03_dance_move.png", "04_dance_return.png"]
+    },
+    "idle_loop": {
+      "frame_duration_ms": 250,
+      "loop": true,
+      "frames": ["00_idle_01.png", "01_blink.png", "02_head_tilt.png", "03_idle_return.png"]
+    },
+    "notification_cycle": {
+      "frame_duration_ms": 200,
+      "loop": true,
+      "frames": ["00_message.png", "01_reminder.png", "02_mention.png", "03_incoming_call.png", "04_urgent.png"]
+    },
+    "silly_loop": {
+      "frame_duration_ms": 200,
+      "loop": true,
+      "frames": ["00_silly_start.png", "01_wink.png", "02_tongue.png", "03_goofy_tilt.png", "04_silly_return.png"]
+    },
+    "sleep_to_wake": {
+      "frame_duration_ms": 333,
+      "loop": false,
+      "frames": ["00_drowsy.png", "01_sleep.png", "02_deep_sleep.png", "03_stir.png", "04_wake.png"]
+    },
+    "success_celebration": {
+      "frame_duration_ms": 200,
+      "loop": false,
+      "frames": ["01_smile.png", "02_jump.png", "03_confetti.png", "04_celebrate_return.png"]
+    },
+    "thinking_loop": {
+      "frame_duration_ms": 250,
+      "loop": true,
+      "frames": ["00_observe.png", "01_consider.png", "02_thinking.png", "03_processing.png", "04_idea.png"]
+    },
+    "warning_to_error": {
+      "frame_duration_ms": 110,
+      "loop": false,
+      "frames": ["00_warning_01.png", "01_warning_00.png", "02_error.png", "03_critical.png"]
+    },
+    "working_loop": {
+      "frame_duration_ms": 200,
+      "loop": true,
+      "frames": ["00_work_ready.png", "01_typing_01.png", "04_work_return.png"]
+    }
+  }
+}

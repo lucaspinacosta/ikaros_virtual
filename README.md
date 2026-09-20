@@ -15,6 +15,7 @@ cargo run
 On Hyprland, this opens a transparent layer-shell owl. It varies its rest time and randomly chooses ground and flight destinations across the active display; it also bobs to MPRIS music detected through `playerctl`. Press `Ctrl+C` in the launching terminal to close it.
 
 In Arch Linux, install `playerctl` for MPRIS support:
+
 ```bash
 sudo pacman -S playerctl
 ```

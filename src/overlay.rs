@@ -841,24 +841,6 @@ fn active_output_size() -> (i32, i32) {
 }
 
 fn frame_path(animation: SpriteLoop, frame: u8) -> PathBuf {
-    let (directory, prefix) = match animation {
-        SpriteLoop::Perch | SpriteLoop::Blink => ("perch_blink", "perch_blink"),
-        SpriteLoop::Sleep => ("sleep_idle", "sleep_idle"),
-        SpriteLoop::WalkLeft => ("walk_left", "walk_left"),
-        SpriteLoop::WalkRight => ("walk_right", "walk_right"),
-        SpriteLoop::Fly => ("wing_flap", "wing_flap"),
-        SpriteLoop::Alert | SpriteLoop::Flinch => ("alert_flinch", "alert_flinch"),
-        SpriteLoop::Idle => ("idle_loop", "idle_01"),
-        SpriteLoop::Party => ("fun_party_loop", "dance_start"),
-        SpriteLoop::Working => ("working_loop", "typing"),
-        SpriteLoop::Thinking => ("thinking_loop", "neutral"),
-        SpriteLoop::Warning => ("warning_to_error", "caution"),
-        SpriteLoop::Charging => ("charging_loop", "charge_start"),
-        SpriteLoop::Presence => ("companion_presence", "presence_01"),
-        SpriteLoop::Success => ("success_celebration", "success_notice"),
-        SpriteLoop::Notification => ("notification_cycle", "message"),
-        SpriteLoop::Silly => ("silly_loop", "playful_grin"),
-    };
     let root = match animation {
         SpriteLoop::Idle
         | SpriteLoop::Party
@@ -872,74 +854,122 @@ fn frame_path(animation: SpriteLoop, frame: u8) -> PathBuf {
         | SpriteLoop::Silly => "assets/sprites/companion-v2",
         _ => "assets/sprites/clockwork-owl",
     };
-    let filename = match animation {
-        SpriteLoop::Idle => format!("{frame:02}_idle_{:02}.png", frame + 1),
-        SpriteLoop::Party => [
-            "00_dance_start.png",
-            "01_dance_sway.png",
-            "02_spin.png",
-            "03_hop.png",
-            "04_dance_reset.png",
-        ][frame as usize]
-            .to_owned(),
-        SpriteLoop::Working => [
-            "00_ready_keyboard.png",
-            "01_typing.png",
-            "02_scan_panel.png",
-            "03_confirm_task.png",
-            "04_ready_loop.png",
-        ][frame as usize]
-            .to_owned(),
-        SpriteLoop::Thinking => [
-            "00_neutral.png",
-            "01_glance.png",
-            "02_thinking.png",
-            "03_processing.png",
-            "04_insight.png",
-        ][frame as usize]
-            .to_owned(),
-        SpriteLoop::Warning => [
-            "00_caution.png",
-            "01_concerned.png",
-            "02_warning_high.png",
-            "03_error.png",
-            "04_critical_error.png",
-        ][frame as usize]
-            .to_owned(),
-        SpriteLoop::Charging => [
-            "00_charge_start.png",
-            "01_charge_build.png",
-            "02_charge_peak.png",
-            "03_charge_stable.png",
-            "04_charge_rest.png",
-        ][frame as usize]
-            .to_owned(),
-        SpriteLoop::Presence => format!("{frame:02}_presence_{:02}.png", frame + 1),
-        SpriteLoop::Success => [
-            "00_success_notice.png",
-            "01_smile.png",
-            "02_hop.png",
-            "03_confetti.png",
-            "04_happy_wink.png",
-        ][frame as usize]
-            .to_owned(),
-        SpriteLoop::Notification => [
-            "00_message.png",
-            "01_reminder.png",
-            "02_mention.png",
-            "03_incoming_call.png",
-            "04_urgent_alert.png",
-        ][frame as usize]
-            .to_owned(),
-        SpriteLoop::Silly => [
-            "00_playful_grin.png",
-            "01_wink.png",
-            "02_tongue_out.png",
-            "03_goofy_tilt.png",
-            "04_grin_reset.png",
-        ][frame as usize]
-            .to_owned(),
-        _ => format!("{prefix}_{frame:02}.png"),
+    let (directory, filename) = match animation {
+        SpriteLoop::Idle => (
+            "idle_loop",
+            [
+                "00_idle_01.png",
+                "01_blink.png",
+                "02_head_tilt.png",
+                "03_idle_return.png",
+            ][frame as usize]
+                .to_owned(),
+        ),
+        SpriteLoop::Party => (
+            "fun_party_loop",
+            [
+                "00_dance_start.png",
+                "01_dance_move.png",
+                "02_spin.png",
+                "03_dance_move.png",
+                "04_dance_return.png",
+            ][frame as usize]
+                .to_owned(),
+        ),
+        SpriteLoop::Working => (
+            "working_loop",
+            [
+                "00_work_ready.png",
+                "01_typing_01.png",
+                "04_work_return.png",
+            ][frame as usize]
+                .to_owned(),
+        ),
+        SpriteLoop::Thinking => (
+            "thinking_loop",
+            [
+                "00_observe.png",
+                "01_consider.png",
+                "02_thinking.png",
+                "03_processing.png",
+                "04_idea.png",
+            ][frame as usize]
+                .to_owned(),
+        ),
+        SpriteLoop::Warning => (
+            "warning_to_error",
+            [
+                "00_warning_01.png",
+                "01_warning_00.png",
+                "02_error.png",
+                "03_critical.png",
+            ][frame as usize]
+                .to_owned(),
+        ),
+        SpriteLoop::Charging => (
+            "charging_loop",
+            [
+                "00_charge_start.png",
+                "01_charge_build.png",
+                "02_charge_peak.png",
+                "03_charge_hold.png",
+                "04_charge_reset.png",
+            ][frame as usize]
+                .to_owned(),
+        ),
+        SpriteLoop::Presence => (
+            "companion_presence",
+            [
+                "00_present_01.png",
+                "01_present_02.png",
+                "02_present_03.png",
+                "03_present_04.png",
+                "04_present_return.png",
+            ][frame as usize]
+                .to_owned(),
+        ),
+        SpriteLoop::Success => (
+            "success_celebration",
+            [
+                "01_smile.png",
+                "02_jump.png",
+                "03_confetti.png",
+                "04_celebrate_return.png",
+            ][frame as usize]
+                .to_owned(),
+        ),
+        SpriteLoop::Notification => (
+            "notification_cycle",
+            [
+                "00_message.png",
+                "01_reminder.png",
+                "02_mention.png",
+                "03_incoming_call.png",
+                "04_urgent.png",
+            ][frame as usize]
+                .to_owned(),
+        ),
+        SpriteLoop::Silly => (
+            "silly_loop",
+            [
+                "00_silly_start.png",
+                "01_wink.png",
+                "02_tongue.png",
+                "03_goofy_tilt.png",
+                "04_silly_return.png",
+            ][frame as usize]
+                .to_owned(),
+        ),
+        SpriteLoop::Perch | SpriteLoop::Blink => {
+            ("perch_blink", format!("perch_blink_{frame:02}.png"))
+        }
+        SpriteLoop::Sleep => ("sleep_idle", format!("sleep_idle_{frame:02}.png")),
+        SpriteLoop::WalkLeft => ("walk_left", format!("walk_left_{frame:02}.png")),
+        SpriteLoop::WalkRight => ("walk_right", format!("walk_right_{frame:02}.png")),
+        SpriteLoop::Fly => ("wing_flap", format!("wing_flap_{frame:02}.png")),
+        SpriteLoop::Alert | SpriteLoop::Flinch => {
+            ("alert_flinch", format!("alert_flinch_{frame:02}.png"))
+        }
     };
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join(root)
@@ -1023,6 +1053,31 @@ mod tests {
 
         let state = life.tick(Duration::from_secs(2), 1000.0, 800.0);
         assert_eq!(state.y, 800.0 - f64::from(OWL_SIZE_PX) - SCREEN_MARGIN_PX);
+    }
+
+    #[test]
+    fn companion_v2_animation_frames_exist() {
+        let animations = [
+            SpriteLoop::Idle,
+            SpriteLoop::Party,
+            SpriteLoop::Working,
+            SpriteLoop::Thinking,
+            SpriteLoop::Warning,
+            SpriteLoop::Charging,
+            SpriteLoop::Presence,
+            SpriteLoop::Success,
+            SpriteLoop::Notification,
+            SpriteLoop::Silly,
+        ];
+
+        for animation in animations {
+            for frame in 0..animation.frame_count() {
+                assert!(
+                    frame_path(animation, frame).is_file(),
+                    "missing frame for {animation:?}: {frame}"
+                );
+            }
+        }
     }
 
     #[test]
