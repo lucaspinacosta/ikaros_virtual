@@ -1,4 +1,4 @@
-// pub mod browser;
+pub mod browser;
 pub mod calendar;
 pub mod collectors;
 pub mod companion;

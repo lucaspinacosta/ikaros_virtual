@@ -13,15 +13,15 @@ use gtk4_layer_shell::{Edge, KeyboardMode, Layer, LayerShell};
 
 use crate::calendar::{CalendarWatcher, RoutineWatcher};
 use crate::collectors::{
-    FileWatcher, IdleWatcher, SessionEvent, SystemdUnitWatcher, TaskCompletionAdapter, file_event,
-    notification_event, session_event, session_idle, session_locked, task_event,
+    file_event, notification_event, session_event, session_idle, session_locked, task_event,
+    FileWatcher, IdleWatcher, SessionEvent, SystemdUnitWatcher, TaskCompletionAdapter,
 };
 use crate::companion::{Companion, SpriteLoop};
-use crate::context::{FocusContext, focused_fullscreen_when};
-use crate::events::{EventKind, EventStore, LocalEvent, event_log_path, record};
+use crate::context::{focused_fullscreen_when, FocusContext};
+use crate::events::{event_log_path, record, EventKind, EventStore, LocalEvent};
 use crate::settings::Settings;
 use crate::status::{
-    AlertEngine, format_status, read_status, read_status_with_focus, send_notification,
+    format_status, read_status, read_status_with_focus, send_notification, AlertEngine,
 };
 use crate::{notifications::NotificationWatcher, routing::animation_for};
 
@@ -541,6 +541,7 @@ enum PetMode {
         start_x: f64,
         target_x: f64,
         arc_height: f64,
+        drift: f64,
     },
     Walk {
         target_x: f64,
@@ -710,11 +711,15 @@ impl PetLife {
                 start_x,
                 target_x,
                 arc_height,
+                drift,
             } => {
                 let progress =
                     (self.mode_elapsed.as_secs_f64() / self.mode_duration.as_secs_f64()).min(1.0);
-                self.x = start_x + (target_x - start_x) * progress;
-                self.y = floor_y - (progress * std::f64::consts::PI).sin() * arc_height;
+                let eased = smoothstep(progress);
+                let lift = (progress * std::f64::consts::PI).sin();
+                let wingbeat = (progress * std::f64::consts::TAU * 2.0).sin() * lift;
+                self.x = start_x + (target_x - start_x) * eased + drift * wingbeat;
+                self.y = floor_y - lift * arc_height - wingbeat * 12.0;
                 SpriteLoop::Fly
             }
             PetMode::Dance => SpriteLoop::Perch,
@@ -788,11 +793,14 @@ impl PetLife {
                 }
             }
             _ => {
-                self.mode_duration = Duration::from_secs(2 + self.next_random() % 4);
+                let target_x = self.random_between(SCREEN_MARGIN_PX, maximum_x);
+                let distance = (target_x - self.x).abs();
+                self.mode_duration = Duration::from_secs_f64((distance / 360.0).clamp(1.2, 3.2));
                 PetMode::Fly {
                     start_x: self.x,
-                    target_x: self.random_between(SCREEN_MARGIN_PX, maximum_x),
-                    arc_height: self.random_between(height * 0.18, height * 0.52),
+                    target_x,
+                    arc_height: self.random_between(height * 0.16, height * 0.34),
+                    drift: self.random_between(-28.0, 28.0),
                 }
             }
         };
@@ -825,6 +833,10 @@ fn approach(value: f64, target: f64, maximum_step: f64) -> f64 {
     } else {
         (value - maximum_step).max(target)
     }
+}
+
+fn smoothstep(progress: f64) -> f64 {
+    progress * progress * (3.0 - 2.0 * progress)
 }
 
 fn music_is_playing() -> bool {
@@ -1075,6 +1087,14 @@ mod tests {
     }
 
     #[test]
+    fn smoothstep_has_gentle_flight_endpoints() {
+        assert_eq!(smoothstep(0.0), 0.0);
+        assert_eq!(smoothstep(1.0), 1.0);
+        assert!(smoothstep(0.25) < 0.25);
+        assert!(smoothstep(0.75) > 0.75);
+    }
+
+    #[test]
     fn a_completed_flight_lands_before_the_next_behavior() {
         let mut life = PetLife {
             x: 80.0,
@@ -1083,6 +1103,7 @@ mod tests {
                 start_x: 80.0,
                 target_x: 700.0,
                 arc_height: 250.0,
+                drift: 18.0,
             },
             initialized: true,
             mode_elapsed: Duration::ZERO,
